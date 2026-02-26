@@ -1,0 +1,31 @@
+qcar2_behavior_tree_manager:
+  ros__parameters:
+    tick_hz: 5.0
+    goal_reached_distance: 0.35
+    goal_timeout_sec: 25.0
+    goal_frame_id: map
+
+    goal_output_topic: /exploration_goal #cambiar al nuevo topico
+    state_output_topic: /bt/state
+    mode_output_topic: /bt/mode_hybrid
+    default_mode_hybrid: HYBRID
+
+    goal_1: [1.50, 0.00, 0.00]
+    goal_2: [2.50, 0.75, 0.20]
+    goal_3: [3.20, -0.40, -0.15]
+
+    additional_goals: []
+
+    mission_loop:
+      - set_mode:HYBRID
+      - wait:3.0
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - wait:5.0
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - wait:5.0
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - wait:7.0
+      - set_mode:LANE_PID_ONLY

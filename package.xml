@@ -22,6 +22,7 @@
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>tf2_ros</depend>
+  <depend>tf2_msgs</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>message_filters</depend>
   <depend>grid_map_msgs</depend>
@@ -35,8 +36,10 @@
   <depend>qcar2_interfaces</depend>
   <depend>qcar2_nodes</depend>
   <depend>qcar2_nodex</depend>
+  <depend>qcar2_mixer</depend>
   <depend>qcar2_object_detections</depend>
   <depend>qcar2_laneseg_acc</depend>
+  <exec_depend>ament_index_python</exec_depend>
   <depend>isaac_ros_yolov8</depend>
   <depend>isaac_ros_tensor_rt</depend>
   <depend>isaac_ros_dnn_image_encoder</depend>
