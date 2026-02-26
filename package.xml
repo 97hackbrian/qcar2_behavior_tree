@@ -4,7 +4,7 @@
   <name>qcar2_behavior_tree</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="hackbrian@todo.todo">hackbrian</maintainer>
+  <maintainer email="brayandurantoconas@gmail.com">hackbrian</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
