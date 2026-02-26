@@ -17,7 +17,7 @@ from qcar2_object_detections.msg import (
     TrafficLightDetection,
     ZebraCrossingDetection,
 )
-from std_msgs.msg import String
+from std_msgs.msg import Float32, String
 from tf2_msgs.msg import TFMessage
 from tf2_ros import Buffer, TransformException, TransformListener
 
@@ -84,6 +84,11 @@ class QCar2BehaviorTreeManager(Node):
             self.get_parameter('mode_output_topic').value,
             10,
         )
+        self.mode_numeric_pub = self.create_publisher(
+            Float32,
+            self.get_parameter('mode_numeric_output_topic').value,
+            10,
+        )
 
         self.create_subscription(PersonDetection, '/detections/person', self._on_person, 10)
         self.create_subscription(StopSignDetection, '/detections/stop_sign', self._on_stop_sign, 10)
@@ -119,7 +124,12 @@ class QCar2BehaviorTreeManager(Node):
         self.declare_parameter('goal_output_topic', '/bt/goal')
         self.declare_parameter('state_output_topic', '/bt/state')
         self.declare_parameter('mode_output_topic', '/bt/mode_hybrid')
+        self.declare_parameter('mode_numeric_output_topic', '/bt/mode_hybrid_numeric')
         self.declare_parameter('default_mode_hybrid', 'LANE_AND_NAV2')
+
+        self.declare_parameter('mode_code_stop', 0.0)
+        self.declare_parameter('mode_code_hybrid', 1.0)
+        self.declare_parameter('mode_code_pid', 2.0)
 
         self.declare_parameter('goal_1', [1.0, 0.0, 0.0])
         self.declare_parameter('goal_2', [2.0, 0.5, 0.0])
@@ -287,7 +297,7 @@ class QCar2BehaviorTreeManager(Node):
         return Status.SUCCESS
 
     def _action_set_mode(self, _: TickContext, mode: str) -> Status:
-        mode = mode.strip() if mode.strip() else 'AUTO_MISSION'
+        mode = self._normalize_mode_name(mode)
         if mode != self.mode_hybrid:
             self.mode_hybrid = mode
             self._publish_mode(mode)
@@ -390,6 +400,38 @@ class QCar2BehaviorTreeManager(Node):
         msg = String()
         msg.data = mode
         self.mode_pub.publish(msg)
+
+        numeric_mode = Float32()
+        numeric_mode.data = self._mode_to_numeric_code(mode)
+        self.mode_numeric_pub.publish(numeric_mode)
+
+    @staticmethod
+    def _normalize_mode_name(raw_mode: str) -> str:
+        cleaned = (raw_mode or '').strip().upper()
+        alias_map = {
+            'AUTO_MISSION': 'HYBRID',
+            'HYBRID': 'HYBRID',
+            'LANE_AND_NAV2': 'HYBRID',
+            'LANE_PID_ONLY': 'LANE_PID',
+            'LANE_PID': 'LANE_PID',
+            'LANE_ONLY': 'LANE_ONLY',
+            'NAV2_TURN': 'NAV2_TURN',
+            'NAV2_FORCED': 'NAV2_FORCED',
+            'STOPPED': 'STOPPED',
+        }
+        return alias_map.get(cleaned, 'HYBRID')
+
+    def _mode_to_numeric_code(self, mode: str) -> float:
+        normalized = self._normalize_mode_name(mode)
+        mode_map = {
+            'STOPPED': float(self.get_parameter('mode_code_stop').value),
+            'HYBRID': float(self.get_parameter('mode_code_hybrid').value),
+            'NAV2_TURN': float(self.get_parameter('mode_code_hybrid').value),
+            'NAV2_FORCED': float(self.get_parameter('mode_code_hybrid').value),
+            'LANE_PID': float(self.get_parameter('mode_code_pid').value),
+            'LANE_ONLY': float(self.get_parameter('mode_code_pid').value),
+        }
+        return mode_map.get(normalized, float(self.get_parameter('mode_code_hybrid').value))
 
 
 def main(args: list[str] | None = None) -> None:

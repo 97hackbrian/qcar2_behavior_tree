@@ -8,7 +8,12 @@ qcar2_behavior_tree_manager:
     goal_output_topic: /exploration_goal #cambiar al nuevo topico
     state_output_topic: /bt/state
     mode_output_topic: /bt/mode_hybrid
+    mode_numeric_output_topic: /bt/mode_hybrid_numeric
     default_mode_hybrid: HYBRID
+
+    mode_code_stop: 0.0
+    mode_code_hybrid: 1.0
+    mode_code_pid: 2.0
 
     goal_1: [1.50, 0.00, 0.00]
     goal_2: [2.50, 0.75, 0.20]
