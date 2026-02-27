@@ -1,8 +1,9 @@
 qcar2_behavior_tree_manager:
   ros__parameters:
     tick_hz: 5.0
+    require_tf: true # Set to true when SLAM/localization is running
     goal_reached_distance: 0.35
-    goal_timeout_sec: 25.0
+    goal_timeout_sec: 900.0
     goal_frame_id: map
 
     goal_output_topic: /bt/goal #cambiar al nuevo topico

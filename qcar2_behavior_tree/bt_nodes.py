@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 
 class Status(Enum):
@@ -14,7 +12,7 @@ class Status(Enum):
 @dataclass
 class TickContext:
     now_sec: float
-    blackboard: dict[str, Any]
+    blackboard: Dict[str, Any]
     publish_state: Callable[[str], None]
 
 
@@ -30,7 +28,7 @@ class BTNode:
 
 
 class Sequence(BTNode):
-    def __init__(self, name: str, children: list[BTNode]):
+    def __init__(self, name: str, children: List['BTNode']):
         super().__init__(name)
         self.children = children
         self.current_index = 0
@@ -53,24 +51,36 @@ class Sequence(BTNode):
 
 
 class Selector(BTNode):
-    def __init__(self, name: str, children: list[BTNode]):
+    """Selector node that tries children in order until one succeeds.
+
+    IMPORTANT: Resets index to 0 on each tick to re-evaluate from the start.
+    This ensures conditions are always checked fresh.
+    """
+    def __init__(self, name: str, children: List['BTNode']):
         super().__init__(name)
         self.children = children
-        self.current_index = 0
+        self.running_index = None  # type: Optional[int]
 
     def tick(self, context: TickContext) -> Status:
-        while self.current_index < len(self.children):
-            child = self.children[self.current_index]
+        # If we were running a child, continue from there
+        start_index = self.running_index if self.running_index is not None else 0
+
+        for i in range(start_index, len(self.children)):
+            child = self.children[i]
             status = child.tick(context)
             if status == Status.RUNNING:
+                self.running_index = i
                 return Status.RUNNING
             if status == Status.SUCCESS:
+                self.running_index = None
                 return Status.SUCCESS
-            self.current_index += 1
+            # FAILURE: try next child
+
+        self.running_index = None
         return Status.FAILURE
 
     def reset(self) -> None:
-        self.current_index = 0
+        self.running_index = None
         for child in self.children:
             child.reset()
 
@@ -112,12 +122,12 @@ class Wait(BTNode):
     def __init__(self, name: str, seconds: float):
         super().__init__(name)
         self.seconds = max(0.0, float(seconds))
-        self.started_at: float | None = None
+        self.started_at = None  # type: Optional[float]
 
     def tick(self, context: TickContext) -> Status:
         if self.started_at is None:
             self.started_at = context.now_sec
-            context.publish_state(f'{self.name}: waiting {self.seconds:.2f}s')
+            context.publish_state('{}: waiting {:.2f}s'.format(self.name, self.seconds))
         elapsed = context.now_sec - self.started_at
         if elapsed >= self.seconds:
             self.started_at = None
