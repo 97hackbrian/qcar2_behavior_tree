@@ -36,15 +36,13 @@ qcar2_behavior_tree_manager:
       - wait_goal_reached_or_timeout
       - set_led:dropoff_done
       - wait:5.0
-      - set_led:dropoff_done
-      - dispatch_next_goal
-      - wait_goal_reached_or_timeout
-      - set_led:idle
-      - wait:7.0
       - set_led:idle
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
       - set_led:idle
-      - wait:7.0
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - set_led:idle
+      - wait:15.0
       - set_led:idle
       - set_mode:STOPPED
