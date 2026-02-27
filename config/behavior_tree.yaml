@@ -16,8 +16,8 @@ qcar2_behavior_tree_manager:
     mode_code_hybrid: 1.0
     mode_code_pid: 2.0
 
-    goal_1: [-1.84, 4.99, 0.0]
-    goal_2: [-0.65, 1.63, 0.0]
+    goal_1: [-1.75, 5.16, 0.0]
+    goal_2: [-0.65, 1.67, 0.0]
     goal_3: [1.155, 4.433, 0.0]
     goal_4: [0.0, 0.0, 0.0]
 
@@ -30,19 +30,19 @@ qcar2_behavior_tree_manager:
       - set_led:to_pickup
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
-      - wait:4.0
+      - wait:5.0
       - set_led:pickup_done
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
       - set_led:dropoff_done
       - wait:5.0
-      - set_led:idle
+      - set_led:dropoff_done
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - set_led:dropoff_done
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
       - set_led:idle
-      - dispatch_next_goal
-      - wait_goal_reached_or_timeout
-      - set_led:idle
-      - wait:15.0
+      - wait:17.0
       - set_led:idle
       - set_mode:STOPPED
