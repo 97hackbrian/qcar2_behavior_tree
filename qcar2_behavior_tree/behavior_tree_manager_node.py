@@ -89,6 +89,11 @@ class QCar2BehaviorTreeManager(Node):
             self.get_parameter('mode_numeric_output_topic').value,
             10,
         )
+        self.led_pub = self.create_publisher(
+            String,
+            self.get_parameter('led_output_topic').value,
+            10,
+        )
 
         self.create_subscription(PersonDetection, '/detections/person', self._on_person, 10)
         self.create_subscription(StopSignDetection, '/detections/stop_sign', self._on_stop_sign, 10)
@@ -125,6 +130,7 @@ class QCar2BehaviorTreeManager(Node):
         self.declare_parameter('state_output_topic', '/bt/state')
         self.declare_parameter('mode_output_topic', '/bt/mode_hybrid')
         self.declare_parameter('mode_numeric_output_topic', '/bt/mode_hybrid_numeric')
+        self.declare_parameter('led_output_topic', '/btled')
         self.declare_parameter('default_mode_hybrid', 'LANE_AND_NAV2')
 
         self.declare_parameter('mode_code_stop', 0.0)
@@ -134,6 +140,7 @@ class QCar2BehaviorTreeManager(Node):
         self.declare_parameter('goal_1', [1.0, 0.0, 0.0])
         self.declare_parameter('goal_2', [2.0, 0.5, 0.0])
         self.declare_parameter('goal_3', [3.0, 0.0, 0.0])
+        self.declare_parameter('goal_4', [4.0, 0.0, 0.0])
         self.declare_parameter('additional_goals', [])
 
         default_tree = [
@@ -150,6 +157,7 @@ class QCar2BehaviorTreeManager(Node):
             self.get_parameter('goal_1').value,
             self.get_parameter('goal_2').value,
             self.get_parameter('goal_3').value,
+            self.get_parameter('goal_4').value,
         ]
         extra = self.get_parameter('additional_goals').value
         if isinstance(extra, list):
@@ -248,6 +256,10 @@ class QCar2BehaviorTreeManager(Node):
             _, mode = token.split(':', 1)
             return Action(f'set_mode_{index}', lambda c, m=mode: self._action_set_mode(c, m))
 
+        if token.startswith('set_led:'):
+            _, led_cmd = token.split(':', 1)
+            return Action(f'set_led_{index}', lambda c, cmd=led_cmd: self._action_set_led(c, cmd))
+
         if token == 'dispatch_next_goal':
             return Action('dispatch_next_goal', self._action_dispatch_next_goal)
 
@@ -301,6 +313,14 @@ class QCar2BehaviorTreeManager(Node):
         if mode != self.mode_hybrid:
             self.mode_hybrid = mode
             self._publish_mode(mode)
+        return Status.SUCCESS
+
+    def _action_set_led(self, _: TickContext, led_cmd: str) -> Status:
+        """Publish LED command to /btled topic for led_sequence_node."""
+        msg = String()
+        msg.data = led_cmd.strip().lower()
+        self.led_pub.publish(msg)
+        self.get_logger().debug(f'LED command published: {msg.data}')
         return Status.SUCCESS
 
     def _action_dispatch_next_goal(self, _: TickContext) -> Status:

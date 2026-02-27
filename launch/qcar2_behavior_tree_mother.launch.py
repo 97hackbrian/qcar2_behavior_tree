@@ -15,7 +15,7 @@ def generate_launch_description():
     mixer_share = get_package_share_directory('qcar2_mixer')
 
     bt_config_default = os.path.join(behavior_tree_share, 'config', 'behavior_tree.yaml')
-    mixer_launch_file = os.path.join(mixer_share, 'launch', 'qcar2_mixer.launch.py')
+    mixer_launch_file = os.path.join(mixer_share, 'launch', 'qcar2_hybrid_planner.launch.py')
 
     bt_config = LaunchConfiguration('bt_config')
     enable_bridge = LaunchConfiguration('enable_bridge')
@@ -28,12 +28,13 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'enable_bridge',
-            default_value='true',
+            default_value='false',
             description='Forward argument to qcar2_mixer launch.',
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(mixer_launch_file),
             launch_arguments={
+                'bt_config': bt_config,
                 'enable_bridge': enable_bridge,
             }.items(),
         ),

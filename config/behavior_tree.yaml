@@ -5,7 +5,7 @@ qcar2_behavior_tree_manager:
     goal_timeout_sec: 25.0
     goal_frame_id: map
 
-    goal_output_topic: /exploration_goal #cambiar al nuevo topico
+    goal_output_topic: /bt/goal #cambiar al nuevo topico
     state_output_topic: /bt/state
     mode_output_topic: /bt/mode_hybrid
     mode_numeric_output_topic: /bt/mode_hybrid_numeric
@@ -15,22 +15,35 @@ qcar2_behavior_tree_manager:
     mode_code_hybrid: 1.0
     mode_code_pid: 2.0
 
-    goal_1: [1.50, 0.00, 0.00]
-    goal_2: [2.50, 0.75, 0.20]
-    goal_3: [3.20, -0.40, -0.15]
+    goal_1: [-1.84, 4.99, 0.0]
+    goal_2: [-0.65, 1.63, 0.0]
+    goal_3: [1.155, 4.433, 0.0]
+    goal_4: [1.155, 4.433, 0.0]
 
     additional_goals: []
 
     mission_loop:
       - set_mode:HYBRID
+      - set_led:init
       - wait:3.0
+      - set_led:to_pickup
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
+      - wait:4.0
+      - set_led:pickup_done
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - set_led:dropoff_done
       - wait:5.0
+      - set_led:dropoff_done
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
-      - wait:5.0
-      - dispatch_next_goal
-      - wait_goal_reached_or_timeout
+      - set_led:idle
       - wait:7.0
-      - set_mode:LANE_PID_ONLY
+      - set_led:idle
+      - dispatch_next_goal
+      - wait_goal_reached_or_timeout
+      - set_led:idle
+      - wait:7.0
+      - set_led:idle
+      - set_mode:STOPPED
