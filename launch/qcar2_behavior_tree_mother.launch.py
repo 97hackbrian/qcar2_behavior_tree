@@ -18,7 +18,6 @@ def generate_launch_description():
     mixer_launch_file = os.path.join(mixer_share, 'launch', 'qcar2_hybrid_planner.launch.py')
 
     bt_config = LaunchConfiguration('bt_config')
-    enable_bridge = LaunchConfiguration('enable_bridge')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -26,17 +25,9 @@ def generate_launch_description():
             default_value=bt_config_default,
             description='Behavior tree configuration YAML file.',
         ),
-        DeclareLaunchArgument(
-            'enable_bridge',
-            default_value='false',
-            description='Forward argument to qcar2_mixer launch.',
-        ),
+        # Include qcar2_hybrid_planner.launch.py - uses its internal default YAMLs
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(mixer_launch_file),
-            launch_arguments={
-                'bt_config': bt_config,
-                'enable_bridge': enable_bridge,
-            }.items(),
         ),
         Node(
             package='qcar2_behavior_tree',

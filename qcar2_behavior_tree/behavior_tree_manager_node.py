@@ -296,6 +296,8 @@ class QCar2BehaviorTreeManager(Node):
         return self.tf_map_odom_ok and self.tf_odom_base_ok and self.tf_map_base_ok
 
     def _action_tf_not_ready(self, _: TickContext) -> Status:
+        if self._is_tf_chain_ready(None):
+            return Status.SUCCESS
         self._publish_state('WAITING_TF_CHAIN map->odom->base_link')
         return Status.RUNNING
 
