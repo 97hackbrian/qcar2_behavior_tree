@@ -4,7 +4,7 @@ qcar2_behavior_tree_manager:
     require_tf: true # Set to true when SLAM/localization is running
     goal_reached_distance: 0.35
     goal_timeout_sec: 900.0
-    goal_frame_id: map
+    goal_frame_id: pgm_map
 
     goal_output_topic: /bt/goal #cambiar al nuevo topico
     state_output_topic: /bt/state
@@ -16,17 +16,17 @@ qcar2_behavior_tree_manager:
     mode_code_hybrid: 1.0
     mode_code_pid: 2.0
 
-    goal_1: [-1.75, 5.16, 0.0]
-    goal_2: [-0.75, 1.64, 0.0]
-    goal_3: [1.155, 4.433, 0.0]
-    goal_4: [0.0, 0.0, 0.0]
+    goal_1: [2.67, 5.93, 0.0]
+    goal_2: [1.41, 2.25, 0.0]
+    goal_3: [4.59, 3.4, 0.0]
+    goal_4: [1.14, 0.52, 0.0]
 
     additional_goals: []
 
     mission_loop:
       - set_mode:HYBRID
       - set_led:init
-      - wait:3.0
+      - wait:6.0
       - set_led:to_pickup
       - dispatch_next_goal
       - wait_goal_reached_or_timeout

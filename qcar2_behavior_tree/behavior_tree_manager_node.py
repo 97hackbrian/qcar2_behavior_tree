@@ -145,7 +145,7 @@ class QCar2BehaviorTreeManager(Node):
         self.declare_parameter('require_tf', True)
         self.declare_parameter('goal_reached_distance', 0.35)
         self.declare_parameter('goal_timeout_sec', 25.0)
-        self.declare_parameter('goal_frame_id', 'map')
+        self.declare_parameter('goal_frame_id', 'pgm_map')
         self.declare_parameter('goal_output_topic', '/bt/goal')
         self.declare_parameter('state_output_topic', '/bt/state')
         self.declare_parameter('mode_output_topic', '/bt/mode_hybrid')
