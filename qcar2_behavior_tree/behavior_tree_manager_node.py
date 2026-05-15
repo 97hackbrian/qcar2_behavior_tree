@@ -46,7 +46,8 @@ from .bt_nodes import (
 class GoalPoint:
     x: float
     y: float
-    yaw: float
+    qz: float  # quaternion z component
+    qw: float  # quaternion w component
 
 
 class QCar2BehaviorTreeManager(Node):
@@ -190,13 +191,18 @@ class QCar2BehaviorTreeManager(Node):
             extra = []
         if isinstance(extra, list):
             for point in extra:
-                if isinstance(point, (list, tuple)) and len(point) >= 3:
+                if isinstance(point, (list, tuple)) and len(point) >= 4:
                     goals_raw.append(point)
 
         goals = []  # type: List[GoalPoint]
         for point in goals_raw:
-            if isinstance(point, (list, tuple)) and len(point) >= 3:
-                goals.append(GoalPoint(float(point[0]), float(point[1]), float(point[2])))
+            if isinstance(point, (list, tuple)) and len(point) >= 4:
+                goals.append(GoalPoint(
+                    float(point[0]), 
+                    float(point[1]), 
+                    float(point[2]),  # qz
+                    float(point[3])   # qw
+                ))
         return goals
 
     # ── Detection callbacks ─────────────────────────────────────────────────
@@ -465,14 +471,23 @@ class QCar2BehaviorTreeManager(Node):
         goal_msg.pose.position.y = self.current_goal.y
         goal_msg.pose.position.z = 0.0
 
-        qx, qy, qz, qw = self._quaternion_from_yaw(self.current_goal.yaw)
-        goal_msg.pose.orientation.x = qx
-        goal_msg.pose.orientation.y = qy
-        goal_msg.pose.orientation.z = qz
-        goal_msg.pose.orientation.w = qw
+        # Use quaternion directly from goal parameters (qz, qw only)
+        goal_msg.pose.orientation.x = 0.0
+        goal_msg.pose.orientation.y = 0.0
+        goal_msg.pose.orientation.z = self.current_goal.qz
+        goal_msg.pose.orientation.w = self.current_goal.qw
 
         self.goal_pub.publish(goal_msg)
         self.goal_published_once = True
+        
+        # Debug: confirm quaternion is being published
+        yaw = 2.0 * math.atan2(self.current_goal.qz, self.current_goal.qw)
+        self.get_logger().info(
+            f'📤 GOAL PUBLISHED index={self.current_goal_index}: '
+            f'pos=({self.current_goal.x:.2f}, {self.current_goal.y:.2f}) '
+            f'quat=(0, 0, {self.current_goal.qz:.3f}, {self.current_goal.qw:.3f}) '
+            f'yaw={yaw:.3f}rad ({math.degrees(yaw):.1f}°)'
+        )
 
     @staticmethod
     def _quaternion_from_yaw(yaw):
