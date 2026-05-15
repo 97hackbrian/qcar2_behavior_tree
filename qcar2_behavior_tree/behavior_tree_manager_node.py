@@ -229,19 +229,21 @@ class QCar2BehaviorTreeManager(Node):
         self._update_tf_flags_from_message(msg)
 
     def _update_tf_flags_from_message(self, msg):
+        frame_id = str(self.get_parameter('goal_frame_id').value).lstrip('/')
         for t in msg.transforms:
             parent = t.header.frame_id.lstrip('/')
             child = t.child_frame_id.lstrip('/')
-            if parent == 'map' and child == 'odom':
+            if parent == frame_id and child == 'odom':
                 self.tf_map_odom_ok = True
             elif parent == 'odom' and child == 'base_link':
                 self.tf_odom_base_ok = True
 
     def _update_tf_chain(self):
+        frame_id = str(self.get_parameter('goal_frame_id').value)
         try:
-            map_to_odom = self.tf_buffer.lookup_transform('map', 'odom', rclpy.time.Time())
+            map_to_odom = self.tf_buffer.lookup_transform(frame_id, 'odom', rclpy.time.Time())
             odom_to_base = self.tf_buffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
-            map_to_base = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+            map_to_base = self.tf_buffer.lookup_transform(frame_id, 'base_link', rclpy.time.Time())
 
             self.tf_map_odom_ok = map_to_odom is not None
             self.tf_odom_base_ok = odom_to_base is not None
