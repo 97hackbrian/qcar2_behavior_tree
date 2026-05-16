@@ -53,15 +53,28 @@ class GoalPoint:
 class QCar2BehaviorTreeManager(Node):
     def __init__(self):
         # type: () -> None
-        super().__init__('qcar2_behavior_tree_manager')
+        super().__init__(
+            'qcar2_behavior_tree_manager',
+            automatically_declare_parameters_from_overrides=True,
+        )
 
-        self._declare_parameters()
+        try:
+            self._declare_parameters()
+        except Exception as e:
+            self.get_logger().error(f'Error declaring parameters: {e}')
+            raise
 
-        self.goals = self._load_goals_from_parameters()
+        try:
+            self.goals = self._load_goals_from_parameters()
+            self.get_logger().info(f'✓ Loaded {len(self.goals)} goals from parameters')
+        except Exception as e:
+            self.get_logger().error(f'Error loading goals: {e}')
+            self.goals = []
         self.current_goal_index = -1
         self.current_goal = None  # type: Optional[GoalPoint]
         self.current_goal_start_sec = None  # type: Optional[float]
         self.goal_published_once = False
+        self.mission_complete_announced = False
 
         self.person_detected = False
         self.stop_sign_detected = False
@@ -127,7 +140,12 @@ class QCar2BehaviorTreeManager(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=True)
 
         self.blackboard = {}  # type: Dict[str, Any]
-        self.root = self._build_tree_from_parameters()
+        try:
+            self.root = self._build_tree_from_parameters()
+            self.get_logger().info('✓ BehaviorTree built successfully')
+        except Exception as e:
+            self.get_logger().error(f'Error building BehaviorTree: {e}')
+            raise
 
         tick_hz = max(1.0, float(self.get_parameter('tick_hz').value))
         self.create_timer(1.0 / tick_hz, self._tick_tree)
@@ -142,26 +160,26 @@ class QCar2BehaviorTreeManager(Node):
 
     def _declare_parameters(self):
         # type: () -> None
-        self.declare_parameter('tick_hz', 5.0)
-        self.declare_parameter('require_tf', True)
-        self.declare_parameter('goal_reached_distance', 0.35)
-        self.declare_parameter('goal_timeout_sec', 25.0)
-        self.declare_parameter('goal_frame_id', 'pgm_map')
-        self.declare_parameter('goal_output_topic', '/bt/goal')
-        self.declare_parameter('state_output_topic', '/bt/state')
-        self.declare_parameter('mode_output_topic', '/bt/mode_hybrid')
-        self.declare_parameter('mode_numeric_output_topic', '/bt/mode_hybrid_numeric')
-        self.declare_parameter('led_output_topic', '/btled')
-        self.declare_parameter('default_mode_hybrid', 'LANE_AND_NAV2')
+        self._declare_parameter_if_needed('tick_hz', 5.0)
+        self._declare_parameter_if_needed('require_tf', True)
+        self._declare_parameter_if_needed('goal_reached_distance', 0.35)
+        self._declare_parameter_if_needed('goal_timeout_sec', 25.0)
+        self._declare_parameter_if_needed('goal_frame_id', 'pgm_map')
+        self._declare_parameter_if_needed('goal_output_topic', '/bt/goal')
+        self._declare_parameter_if_needed('state_output_topic', '/bt/state')
+        self._declare_parameter_if_needed('mode_output_topic', '/bt/mode_hybrid')
+        self._declare_parameter_if_needed('mode_numeric_output_topic', '/bt/mode_hybrid_numeric')
+        self._declare_parameter_if_needed('led_output_topic', '/btled')
+        self._declare_parameter_if_needed('default_mode_hybrid', 'LANE_AND_NAV2')
 
-        self.declare_parameter('mode_code_stop', 0.0)
-        self.declare_parameter('mode_code_hybrid', 1.0)
-        self.declare_parameter('mode_code_pid', 2.0)
+        self._declare_parameter_if_needed('mode_code_stop', 0.0)
+        self._declare_parameter_if_needed('mode_code_hybrid', 1.0)
+        self._declare_parameter_if_needed('mode_code_pid', 2.0)
 
-        self.declare_parameter('goal_1', [1.0, 0.0, 0.0])
-        self.declare_parameter('goal_2', [2.0, 0.5, 0.0])
-        self.declare_parameter('goal_3', [3.0, 0.0, 0.0])
-        self.declare_parameter('goal_4', [4.0, 0.0, 0.0])
+        self._declare_parameter_if_needed('goal_1', [1.0, 0.0, 0.0, 1.0])
+        self._declare_parameter_if_needed('goal_2', [2.0, 0.5, 0.0, 1.0])
+        self._declare_parameter_if_needed('goal_3', [3.0, 0.0, 0.0, 1.0])
+        self._declare_parameter_if_needed('goal_4', [4.0, 0.0, 0.0, 1.0])
         # NOTE: additional_goals is NOT declared here because ROS 2 Humble
         # cannot infer the type of an empty list []. It is read via
         # try/except in _load_goals_from_parameters instead.
@@ -173,16 +191,28 @@ class QCar2BehaviorTreeManager(Node):
             'wait_goal_reached_or_timeout',
             'wait:0.8',
         ]
-        self.declare_parameter('mission_loop', default_tree)
+        self._declare_parameter_if_needed('mission_loop', default_tree)
+
+    def _declare_parameter_if_needed(self, name, default_value):
+        # type: (str, Any) -> None
+        if not self.has_parameter(name):
+            self.declare_parameter(name, default_value)
 
     def _load_goals_from_parameters(self):
         # type: () -> List[GoalPoint]
-        goals_raw = [
-            self.get_parameter('goal_1').value,
-            self.get_parameter('goal_2').value,
-            self.get_parameter('goal_3').value,
-            self.get_parameter('goal_4').value,
-        ]
+        goals_raw = []  # type: List[Any]
+
+        # ROS 2 Humble: No list_parameters() en Node.
+        # Cargamos goal_1 a goal_100 secuencialmente hasta encontrar los que existen.
+        for goal_num in range(1, 101):
+            param_name = f'goal_{goal_num}'
+            try:
+                goal_value = self.get_parameter(param_name).value
+                goals_raw.append(goal_value)
+                self.get_logger().debug(f'  Loaded {param_name}: {goal_value}')
+            except Exception:
+                # Parámetro no existe, continuar
+                continue
 
         # additional_goals is optional — may not be declared if YAML has []
         try:
@@ -245,20 +275,43 @@ class QCar2BehaviorTreeManager(Node):
                 self.tf_odom_base_ok = True
 
     def _update_tf_chain(self):
-        frame_id = str(self.get_parameter('goal_frame_id').value)
+        frame_id = str(self.get_parameter('goal_frame_id').value).lstrip('/')
+
+        map_to_odom = None
+        map_to_base = None
+        odom_to_base = None
+
         try:
             map_to_odom = self.tf_buffer.lookup_transform(frame_id, 'odom', rclpy.time.Time())
+        except TransformException:
+            map_to_odom = None
+
+        try:
             odom_to_base = self.tf_buffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
+        except TransformException:
+            odom_to_base = None
+
+        try:
             map_to_base = self.tf_buffer.lookup_transform(frame_id, 'base_link', rclpy.time.Time())
+        except TransformException:
+            map_to_base = None
 
-            self.tf_map_odom_ok = map_to_odom is not None
-            self.tf_odom_base_ok = odom_to_base is not None
-            self.tf_map_base_ok = map_to_base is not None
+        # Fallback chain support when the tree is goal_frame -> map -> odom -> base_link
+        if map_to_odom is None and frame_id != 'map':
+            try:
+                frame_to_map = self.tf_buffer.lookup_transform(frame_id, 'map', rclpy.time.Time())
+                map_to_odom_fallback = self.tf_buffer.lookup_transform('map', 'odom', rclpy.time.Time())
+                map_to_odom = map_to_odom_fallback if frame_to_map is not None else None
+            except TransformException:
+                map_to_odom = None
 
+        self.tf_map_odom_ok = map_to_odom is not None
+        self.tf_odom_base_ok = odom_to_base is not None
+        self.tf_map_base_ok = map_to_base is not None
+
+        if map_to_base is not None:
             self.robot_x = float(map_to_base.transform.translation.x)
             self.robot_y = float(map_to_base.transform.translation.y)
-        except TransformException:
-            self.tf_map_base_ok = False
 
     # ── BT tree construction ────────────────────────────────────────────────
 
@@ -321,28 +374,32 @@ class QCar2BehaviorTreeManager(Node):
     # ── BT tick ─────────────────────────────────────────────────────────────
 
     def _tick_tree(self):
-        self.blackboard['person_detected'] = self.person_detected
-        self.blackboard['stop_sign_detected'] = self.stop_sign_detected
-        self.blackboard['zebra_detected'] = self.zebra_detected
-        self.blackboard['traffic_light_detected'] = self.traffic_light_detected
-        self.blackboard['traffic_light_state'] = self.traffic_light_state
-        self.blackboard['mixer_state'] = self.mixer_state
-        self.blackboard['tf_ok'] = self._is_tf_chain_ready(None)
-        self.blackboard['current_goal_index'] = self.current_goal_index
+        try:
+            self.blackboard['person_detected'] = self.person_detected
+            self.blackboard['stop_sign_detected'] = self.stop_sign_detected
+            self.blackboard['zebra_detected'] = self.zebra_detected
+            self.blackboard['traffic_light_detected'] = self.traffic_light_detected
+            self.blackboard['traffic_light_state'] = self.traffic_light_state
+            self.blackboard['mixer_state'] = self.mixer_state
+            self.blackboard['tf_ok'] = self._is_tf_chain_ready(None)
+            self.blackboard['current_goal_index'] = self.current_goal_index
 
-        context = TickContext(
-            now_sec=self.get_clock().now().nanoseconds / 1e9,
-            blackboard=self.blackboard,
-            publish_state=self._publish_state,
-        )
+            context = TickContext(
+                now_sec=self.get_clock().now().nanoseconds / 1e9,
+                blackboard=self.blackboard,
+                publish_state=self._publish_state,
+            )
 
-        status = self.root.tick(context)
-        if status == Status.FAILURE:
-            self._publish_state('BT_FAILURE')
-            self.root.reset()
-        elif status == Status.SUCCESS:
-            self._publish_state('BT_SUCCESS')
-            self.root.reset()
+            status = self.root.tick(context)
+            if status == Status.FAILURE:
+                self._publish_state('BT_FAILURE')
+                self.root.reset()
+            elif status == Status.SUCCESS:
+                self._publish_state('BT_SUCCESS')
+                self.root.reset()
+        except Exception as e:
+            self.get_logger().error(f'Error in _tick_tree: {e}', exc_info=True)
+            self._publish_state(f'BT_ERROR: {str(e)[:80]}')
 
     # ── BT action callbacks ────────────────────────────────────────────────
 
@@ -354,7 +411,13 @@ class QCar2BehaviorTreeManager(Node):
         # type: (TickContext) -> Status
         if self._is_tf_chain_ready(None):
             return Status.SUCCESS
-        self._publish_state('WAITING_TF_CHAIN map->odom->base_link')
+        goal_frame = str(self.get_parameter('goal_frame_id').value).lstrip('/')
+        self._publish_state(
+            'WAITING_TF_CHAIN {}->odom->base_link (or {}->map->odom->base_link)'.format(
+                goal_frame,
+                goal_frame,
+            )
+        )
         return Status.RUNNING
 
     def _action_publish_runtime_state(self, _):
@@ -395,13 +458,16 @@ class QCar2BehaviorTreeManager(Node):
 
         next_index = self.current_goal_index + 1
         if next_index >= len(self.goals):
-            self._publish_state('MISSION_COMPLETE')
+            if not self.mission_complete_announced:
+                self._publish_state('MISSION_COMPLETE')
+                self.mission_complete_announced = True
             return Status.SUCCESS
 
         self.current_goal_index = next_index
         self.current_goal = self.goals[self.current_goal_index]
         self.current_goal_start_sec = self.get_clock().now().nanoseconds / 1e9
         self.goal_published_once = False
+        self.mission_complete_announced = False
         self._publish_current_goal()
         self._publish_state('GOAL_DISPATCHED index={}'.format(self.current_goal_index))
         return Status.SUCCESS
@@ -431,8 +497,7 @@ class QCar2BehaviorTreeManager(Node):
     def _action_check_all_goals_done(self, _):
         # type: (TickContext) -> Status
         if self.current_goal is None and (self.current_goal_index + 1) >= len(self.goals):
-            self._publish_state('ALL_GOALS_DONE_WAITING_LOOP_RESET')
-            self.current_goal_index = -1
+            self._publish_state('ALL_GOALS_DONE')
             return Status.SUCCESS
         return Status.SUCCESS
 
