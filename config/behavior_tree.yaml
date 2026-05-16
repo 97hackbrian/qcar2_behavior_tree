@@ -3,7 +3,7 @@ qcar2_behavior_tree_manager:
     tick_hz: 5.0
     require_tf: true # Set to true when SLAM/localization is running
     goal_reached_distance: 0.35
-    goal_timeout_sec: 900.0
+    goal_timeout_sec: 999.0
     goal_frame_id: pgm_map
 
     goal_output_topic: /bt/goal #cambiar al nuevo topico
@@ -20,7 +20,7 @@ qcar2_behavior_tree_manager:
     goal_2: [4.5473, 4.4822, 0.7, 0.7]
     goal_3: [2.67, 5.93, 1.0, 0.0]
     goal_4: [1.41, 2.25, 0.0, 1.0]
-    goal_5: [4.6, 4.59, 0.7, 0.7]
+    goal_5: [4.6, 3.2, 0.7, 0.7]
     goal_6: [1.14, 0.52, -0.31, 0.94]
 
     additional_goals: []
