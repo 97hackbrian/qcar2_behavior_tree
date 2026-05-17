@@ -2,7 +2,7 @@ qcar2_behavior_tree_manager:
   ros__parameters:
     tick_hz: 5.0
     require_tf: true # Set to true when SLAM/localization is running
-    goal_reached_distance: 0.35
+    goal_reached_distance: 0.2
     goal_timeout_sec: 999.0
     goal_frame_id: pgm_map
 
@@ -28,7 +28,7 @@ qcar2_behavior_tree_manager:
     mission_loop:
       - set_mode:HYBRID
       - set_led:init
-      - wait:20.0
+      - wait:40.0
       - set_led:to_pickup
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
