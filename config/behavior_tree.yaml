@@ -28,7 +28,7 @@ qcar2_behavior_tree_manager:
     mission_loop:
       - set_mode:HYBRID
       - set_led:init
-      - wait:40.0
+      - wait:60.0
       - set_led:to_pickup
       - dispatch_next_goal
       - wait_goal_reached_or_timeout
