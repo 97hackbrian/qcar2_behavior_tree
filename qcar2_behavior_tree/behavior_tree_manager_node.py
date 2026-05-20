@@ -9,6 +9,7 @@ from rclpy.node import Node
 
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float32, String
+from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from tf2_ros import Buffer, TransformException, TransformListener
 
@@ -75,6 +76,10 @@ class QCar2BehaviorTreeManager(Node):
         self.current_goal_start_sec = None  # type: Optional[float]
         self.goal_published_once = False
         self.mission_complete_announced = False
+
+        # ── Service-based mission control ────────────────────────────────
+        self._mission_armed = False   # True after /bt/start, False after /bt/stop or /bt/reset
+        self._mission_running = True  # Controls whether tick loop processes the tree
 
         self.person_detected = False
         self.stop_sign_detected = False
@@ -147,16 +152,23 @@ class QCar2BehaviorTreeManager(Node):
             self.get_logger().error(f'Error building BehaviorTree: {e}')
             raise
 
+        # ── Service servers for mission control ────────────────────────
+        self.start_srv = self.create_service(Trigger, '/bt/start', self._srv_start)
+        self.stop_srv = self.create_service(Trigger, '/bt/stop', self._srv_stop)
+        self.reset_srv = self.create_service(Trigger, '/bt/reset', self._srv_reset)
+
         tick_hz = max(1.0, float(self.get_parameter('tick_hz').value))
         self.create_timer(1.0 / tick_hz, self._tick_tree)
         self.create_timer(0.1, self._update_tf_chain)
 
         self._publish_mode(self.mode_hybrid)
+        self._publish_state('IDLE — waiting for /bt/start service call')
         self.get_logger().info(
             'BehaviorTree manager iniciado con {} goals | tick_hz={:.1f}'.format(
                 len(self.goals), tick_hz
             )
         )
+        self.get_logger().info('⏸  Mission IDLE — call /bt/start to begin')
 
     def _declare_parameters(self):
         # type: () -> None
@@ -369,11 +381,18 @@ class QCar2BehaviorTreeManager(Node):
         if token == 'wait_goal_reached_or_timeout':
             return Action('wait_goal_reached_or_timeout', self._action_wait_goal_reached_or_timeout)
 
+        if token == 'wait_for_start':
+            return Action('wait_for_start_{}'.format(index), self._action_wait_for_start)
+
         return Action('noop_{}'.format(index), lambda c: Status.SUCCESS)
 
     # ── BT tick ─────────────────────────────────────────────────────────────
 
     def _tick_tree(self):
+        # When mission is stopped via /bt/stop, do NOT tick the tree at all.
+        if not self._mission_running:
+            return
+
         try:
             self.blackboard['person_detected'] = self.person_detected
             self.blackboard['stop_sign_detected'] = self.stop_sign_detected
@@ -401,7 +420,72 @@ class QCar2BehaviorTreeManager(Node):
             self.get_logger().error(f'Error in _tick_tree: {e}', exc_info=True)
             self._publish_state(f'BT_ERROR: {str(e)[:80]}')
 
+    # ── Service handlers ────────────────────────────────────────────────────
+
+    def _srv_start(self, request, response):
+        """Service handler for /bt/start — arms the mission and resumes ticking."""
+        if self._mission_armed and self._mission_running:
+            response.success = True
+            response.message = 'Mission already running'
+            self.get_logger().info('▶  /bt/start called — mission already running')
+            return response
+
+        self._mission_armed = True
+        self._mission_running = True
+        response.success = True
+        response.message = 'Mission STARTED'
+        self._publish_state('MISSION_STARTED')
+        self.get_logger().info('▶  /bt/start — Mission ARMED and RUNNING')
+        return response
+
+    def _srv_stop(self, request, response):
+        """Service handler for /bt/stop — stops ticking and sets mode STOPPED."""
+        self._mission_armed = False
+        self._mission_running = False
+        self.mode_hybrid = 'STOPPED'
+        self._publish_mode('STOPPED')
+        self._publish_state('MISSION_STOPPED')
+        response.success = True
+        response.message = 'Mission STOPPED'
+        self.get_logger().info('⏹  /bt/stop — Mission STOPPED')
+        return response
+
+    def _srv_reset(self, request, response):
+        """Service handler for /bt/reset — resets tree and goal state to initial."""
+        self._mission_armed = False
+        self._mission_running = True  # Allow ticking so wait_for_start can be evaluated
+
+        # Reset BT tree state
+        self.root.reset()
+
+        # Reset goal tracking
+        self.current_goal_index = -1
+        self.current_goal = None
+        self.current_goal_start_sec = None
+        self.goal_published_once = False
+        self.mission_complete_announced = False
+
+        # Reset mode to default
+        default_mode = self.get_parameter('default_mode_hybrid').value
+        self.mode_hybrid = default_mode
+        self._publish_mode(default_mode)
+
+        self._publish_state('MISSION_RESET — waiting for /bt/start')
+        response.success = True
+        response.message = 'Mission RESET to initial state'
+        self.get_logger().info('🔄 /bt/reset — Mission RESET, waiting for /bt/start')
+        return response
+
     # ── BT action callbacks ────────────────────────────────────────────────
+
+    def _action_wait_for_start(self, context):
+        # type: (TickContext) -> Status
+        """Blocks the mission sequence until /bt/start service is called."""
+        if self._mission_armed:
+            self.get_logger().info('✅ Mission armed — proceeding with sequence')
+            return Status.SUCCESS
+        context.publish_state('WAITING_FOR_START — call: ros2 service call /bt/start std_srvs/srv/Trigger')
+        return Status.RUNNING
 
     def _is_tf_chain_ready(self, _):
         # type: (Any) -> bool
